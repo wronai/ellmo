@@ -134,7 +134,7 @@ format:
 	@echo "$(GREEN)✓ Code formatted$(NC)"
 
 # Service management targets
-.PHONY: start stop restart status logs enable disable
+.PHONY: start stop stop-all restart status logs enable disable
 start:
 	@echo "$(BLUE)Starting Ellmo...$(NC)"
 	@sudo systemctl start $(SERVICE_NAME)
@@ -142,9 +142,10 @@ start:
 	@sudo systemctl status $(SERVICE_NAME) --no-pager
 
 stop:
-	@echo "$(BLUE)Stopping Ellmo...$(NC)"
-	@sudo systemctl stop $(SERVICE_NAME)
-	@echo "$(GREEN)✓ Service stopped$(NC)"
+	@./scripts/stop_service.sh $(SERVICE_NAME)
+
+stop-all:
+	@./scripts/stop_all_instances.sh
 
 restart:
 	@echo "$(BLUE)Restarting Ellmo...$(NC)"
@@ -271,23 +272,10 @@ doctor:
 	fi
 	@echo ""
 	@echo "$(BLUE)=== Python Dependencies ===$(NC)"
-	@python3 -c "
-import sys
-modules = ['speech_recognition', 'pyttsx3', 'requests', 'json']
-for module in modules:
-    try:
-        __import__(module)
-        print('$(GREEN)✓$(NC) ' + module)
-    except ImportError:
-        print('$(RED)✗$(NC) ' + module)
-" 2>/dev/null
+	@./scripts/check_deps.sh
 	@echo ""
 	@echo "$(BLUE)=== Ellmo Status ===$(NC)"
-	@if systemctl is-active --quiet $(SERVICE_NAME); then \
-		echo "$(GREEN)✓ Ellmo service running$(NC)"; \
-	else \
-		echo "$(RED)✗ Ellmo service not running$(NC)"; \
-	fi
+	@./scripts/check_status.sh $(SERVICE_NAME)
 	@echo ""
 	@echo "$(BLUE)=== Configuration ===$(NC)"
 	@if [ -f "$(INSTALL_DIR)/config.json" ]; then \
@@ -381,19 +369,21 @@ package-deb:
 	@dpkg-deb --build dist/deb dist/$(APP_NAME).deb
 	@echo "$(GREEN)✓ .deb package created$(NC)"
 
+.PHONY: create-installer
 create-installer:
 	@echo "$(BLUE)Creating standalone installer...$(NC)"
+	@mkdir -p dist
 	@cat > dist/install-standalone.sh << 'EOF'
-#!/bin/bash
-# Standalone installer - extracts and runs installation
-ARCHIVE_START=$(awk '/^__ARCHIVE_BELOW__$/{print NR + 1; exit 0; }' $0)
-tail -n+$ARCHIVE_START $0 | tar xzf -
-cd flutter-voice-assistant
-chmod +x install.sh
-./install.sh
-exit 0
-__ARCHIVE_BELOW__
-EOF
+	#!/bin/bash
+	# Standalone installer - extracts and runs installation
+	ARCHIVE_START=$$(awk '/^__ARCHIVE_BELOW__$$/{print NR + 1; exit 0; }' $$0)
+	tail -n+$$ARCHIVE_START $$0 | tar xzf -
+	cd flutter-voice-assistant
+	chmod +x install.sh
+	./install.sh
+	exit 0
+	__ARCHIVE_BELOW__
+	EOF
 	@tar czf - . --exclude=dist --exclude=.git | cat dist/install-standalone.sh - > dist/install-standalone.sh.tmp
 	@mv dist/install-standalone.sh.tmp dist/install-standalone.sh
 	@chmod +x dist/install-standalone.sh
@@ -430,39 +420,17 @@ help-config:
 # Install git hooks
 .PHONY: install-hooks
 install-hooks:
-	@echo "$(BLUE)Installing git hooks...$(NC)"
-	@mkdir -p .git/hooks
-	@echo '#!/bin/bash\nmake format' > .git/hooks/pre-commit
-	@chmod +x .git/hooks/pre-commit
-	@echo "$(GREEN)✓ Git hooks installed$(NC)"
+	@./scripts/install_hooks.sh
 
 # Cleanup temporary files
 .PHONY: clean-all
 clean-all: clean
-	@echo "$(BLUE)Cleaning all temporary files...$(NC)"
-	@rm -rf dist/
-	@rm -f /tmp/voice_assistant_*
-	@rm -f /tmp/test_audio.wav
-	@echo "$(GREEN)✓ All cleanup completed$(NC)")
-	@echo "$(GREEN)✓ Autostart disabled$(NC)"
+	@./scripts/clean_all.sh
 
 # Configuration targets
 .PHONY: config config-show config-reset
-config:
-	@echo "$(BLUE)Opening configuration...$(NC)"
-	@if [ -f "utils.sh" ]; then ./utils.sh configure; else echo "$(RED)utils.sh not found$(NC)"; fi
-
-config-show:
-	@echo "$(BLUE)Current Configuration:$(NC)"
-	@if [ -f "$(INSTALL_DIR)/config.json" ]; then \
-		cat $(INSTALL_DIR)/config.json | python3 -m json.tool; \
-	else \
-		echo "$(YELLOW)No configuration file found$(NC)"; \
-	fi
-
-config-reset:
-	@echo "$(BLUE)Resetting configuration to defaults...$(NC)"
-	@sudo rm -f $(INSTALL_DIR)/config.json
+config config-show config-reset:
+	@./scripts/config_utils.sh "$(INSTALL_DIR)/config.json" "$(@:config-%=%)"
 	@echo "$(GREEN)✓ Configuration reset$(NC)"
 
 # Maintenance targets
