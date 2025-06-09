@@ -1907,8 +1907,8 @@ EOF
 # Main installation function with comprehensive error handling
 main() {
     echo -e "${GREEN}╔════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║           Ellmo Installer v2.0        ║${NC}"
-    echo -e "${GREEN}║     Advanced AI Voice Assistant       ║${NC}"
+    echo -e "${GREEN}║           Ellmo Installer v2.0         ║${NC}"
+    echo -e "${GREEN}║     Advanced AI Voice Assistant        ║${NC}"
     echo -e "${GREEN}╚════════════════════════════════════════╝${NC}"
     echo
 
@@ -1923,40 +1923,6 @@ main() {
         echo -e "${RED}Error: Do not run as root. Use your regular user account.${NC}"
         exit 1
     fi
-
-    # Parse command line arguments
-    ALLOW_CLEANUP="0"
-    DEBUG="0"
-
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            --debug)
-                DEBUG="1"
-                log "INFO" "Debug mode enabled"
-                set -x
-                shift
-                ;;
-            --allow-cleanup)
-                ALLOW_CLEANUP="1"
-                log "INFO" "Cleanup on error enabled"
-                shift
-                ;;
-            --help|-h)
-                echo "Ellmo Advanced Installer"
-                echo "Usage: $0 [OPTIONS]"
-                echo ""
-                echo "Options:"
-                echo "  --debug         Enable debug output"
-                echo "  --allow-cleanup Remove incomplete installation on error"
-                echo "  --help          Show this help message"
-                exit 0
-                ;;
-            *)
-                log "WARNING" "Unknown option: $1"
-                shift
-                ;;
-        esac
-    done
 
     # Execute installation steps
     detect_system
@@ -1989,7 +1955,7 @@ main() {
 
     echo
     echo -e "${GREEN}╔════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║     Installation Completed! 🎉        ║${NC}"
+    echo -e "${GREEN}║     Installation Completed! 🎉         ║${NC}"
     echo -e "${GREEN}╚════════════════════════════════════════╝${NC}"
     echo
 
@@ -2038,6 +2004,45 @@ main() {
     log "INFO" "Installation script completed"
 }
 
+# Parse command line arguments safely
+ALLOW_CLEANUP="0"
+DEBUG="0"
+
+# Process arguments
+for arg in "$@"; do
+    case $arg in
+        --debug)
+            DEBUG="1"
+            log "INFO" "Debug mode enabled"
+            set -x
+            ;;
+        --allow-cleanup)
+            ALLOW_CLEANUP="1"
+            log "INFO" "Cleanup on error enabled"
+            ;;
+        --help|-h)
+            echo "Ellmo Advanced Installer"
+            echo "Usage: $0 [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  --debug         Enable debug output"
+            echo "  --allow-cleanup Remove incomplete installation on error"
+            echo "  --help          Show this help message"
+            exit 0
+            ;;
+        --self-test)
+            echo "Running installer self-test..."
+            detect_system
+            check_requirements
+            echo "Self-test completed successfully!"
+            exit 0
+            ;;
+        -*)
+            log "WARNING" "Unknown option: $arg"
+            ;;
+    esac
+done
+
 # Signal handlers for graceful shutdown
 cleanup_on_interrupt() {
     log "WARNING" "Installation interrupted by user"
@@ -2052,28 +2057,5 @@ cleanup_on_interrupt() {
 
 trap cleanup_on_interrupt INT TERM
 
-# Self-test function
-self_test() {
-    echo "Running installer self-test..."
-
-    # Test log function
-    log "INFO" "Self-test: Logging system"
-
-    # Test system detection
-    detect_system
-
-    # Test requirements check
-    check_requirements
-
-    echo "Self-test completed successfully!"
-}
-
-# Run self-test if requested
-if [[ "$1" == "--self-test" ]]; then
-    self_test
-    exit 0
-fi
-
-# Execute main installation
-main "$@"#!/bin/bash
-
+# Execute main installation if not in test mode
+main "$@"
