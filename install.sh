@@ -2,7 +2,7 @@
 
 # Ellmo - Advanced Installer with Comprehensive Logging
 # Supports: Raspberry Pi, Radxa, Fedora, Ubuntu, Debian, Arch Linux
-# Version: 2.0.0
+# Version: 2.0.1 - Fixed argument parsing
 
 set -e
 
@@ -1904,6 +1904,46 @@ EOF
     log "SUCCESS" "Utility scripts created"
 }
 
+# Parse command line arguments safely
+parse_arguments() {
+    ALLOW_CLEANUP="0"
+    DEBUG="0"
+
+    # Process arguments
+    for arg in "$@"; do
+        case $arg in
+            --debug)
+                DEBUG="1"
+                log "INFO" "Debug mode enabled"
+                ;;
+            --allow-cleanup)
+                ALLOW_CLEANUP="1"
+                log "INFO" "Cleanup on error enabled"
+                ;;
+            --help|-h)
+                echo "Ellmo Advanced Installer"
+                echo "Usage: $0 [OPTIONS]"
+                echo ""
+                echo "Options:"
+                echo "  --debug         Enable debug output"
+                echo "  --allow-cleanup Remove incomplete installation on error"
+                echo "  --help          Show this help message"
+                exit 0
+                ;;
+            --self-test)
+                echo "Running installer self-test..."
+                detect_system
+                check_requirements
+                echo "Self-test completed successfully!"
+                exit 0
+                ;;
+            -*)
+                log "WARNING" "Unknown option: $arg"
+                ;;
+        esac
+    done
+}
+
 # Main installation function with comprehensive error handling
 main() {
     echo -e "${GREEN}╔════════════════════════════════════════╗${NC}"
@@ -1923,6 +1963,9 @@ main() {
         echo -e "${RED}Error: Do not run as root. Use your regular user account.${NC}"
         exit 1
     fi
+
+    # Parse command line arguments
+    parse_arguments "$@"
 
     # Execute installation steps
     detect_system
@@ -2004,45 +2047,6 @@ main() {
     log "INFO" "Installation script completed"
 }
 
-# Parse command line arguments safely
-ALLOW_CLEANUP="0"
-DEBUG="0"
-
-# Process arguments
-for arg in "$@"; do
-    case $arg in
-        --debug)
-            DEBUG="1"
-            log "INFO" "Debug mode enabled"
-            set -x
-            ;;
-        --allow-cleanup)
-            ALLOW_CLEANUP="1"
-            log "INFO" "Cleanup on error enabled"
-            ;;
-        --help|-h)
-            echo "Ellmo Advanced Installer"
-            echo "Usage: $0 [OPTIONS]"
-            echo ""
-            echo "Options:"
-            echo "  --debug         Enable debug output"
-            echo "  --allow-cleanup Remove incomplete installation on error"
-            echo "  --help          Show this help message"
-            exit 0
-            ;;
-        --self-test)
-            echo "Running installer self-test..."
-            detect_system
-            check_requirements
-            echo "Self-test completed successfully!"
-            exit 0
-            ;;
-        -*)
-            log "WARNING" "Unknown option: $arg"
-            ;;
-    esac
-done
-
 # Signal handlers for graceful shutdown
 cleanup_on_interrupt() {
     log "WARNING" "Installation interrupted by user"
@@ -2057,5 +2061,5 @@ cleanup_on_interrupt() {
 
 trap cleanup_on_interrupt INT TERM
 
-# Execute main installation if not in test mode
+# Execute main installation
 main "$@"

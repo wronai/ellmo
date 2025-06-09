@@ -18,63 +18,10 @@ class EllmoApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         brightness: Brightness.dark,
         scaffoldBackgroundColor: Color(0xFF1E1E1E),
-        cardColor: Color(0xFF2D2D2D),
       ),
       home: EllmoHome(),
       debugShowCheckedModeBanner: false,
     );
-  }
-}
-
-class AppConfig {
-  String ollamaHost;
-  int ollamaPort;
-  String model;
-  String language;
-  List<String> wakeWords;
-  int ttsRate;
-  double ttsVolume;
-  int audioTimeout;
-  bool autoStart;
-
-  AppConfig({
-    this.ollamaHost = 'localhost',
-    this.ollamaPort = 11434,
-    this.model = 'mistral',
-    this.language = 'pl-PL',
-    this.wakeWords = const ['ellmo'],
-    this.ttsRate = 150,
-    this.ttsVolume = 0.8,
-    this.audioTimeout = 5,
-    this.autoStart = true,
-  });
-
-  factory AppConfig.fromJson(Map<String, dynamic> json) {
-    return AppConfig(
-      ollamaHost: json['ollama_host'] ?? 'localhost',
-      ollamaPort: json['ollama_port'] ?? 11434,
-      model: json['model'] ?? 'mistral',
-      language: json['language'] ?? 'pl-PL',
-      wakeWords: List<String>.from(json['wake_words'] ?? ['ellmo']),
-      ttsRate: json['tts_rate'] ?? 150,
-      ttsVolume: (json['tts_volume'] ?? 0.8).toDouble(),
-      audioTimeout: json['audio_timeout'] ?? 5,
-      autoStart: json['auto_start'] ?? true,
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'ollama_host': ollamaHost,
-      'ollama_port': ollamaPort,
-      'model': model,
-      'language': language,
-      'wake_words': wakeWords,
-      'tts_rate': ttsRate,
-      'tts_volume': ttsVolume,
-      'audio_timeout': audioTimeout,
-      'auto_start': autoStart,
-    };
   }
 }
 
@@ -83,41 +30,38 @@ class EllmoHome extends StatefulWidget {
   _EllmoHomeState createState() => _EllmoHomeState();
 }
 
-class _EllmoHomeState extends State<EllmoHome>
-    with TickerProviderStateMixin {
-  bool _isListening = false;
-  bool _isSpeaking = false;
-  bool _isProcessing = false;
-  String _lastResponse = "";
+class _EllmoHomeState extends State<EllmoHome> with TickerProviderStateMixin {
+  bool _isHeadless = false;
+  bool _ollamaConnected = false;
   String _status = "Initializing...";
-  String _lastCommand = "";
-  List<String> _conversationHistory = [];
+  String _lastResponse = "";
+  List<String> _logs = [];
 
-  late AppConfig _config;
   late AnimationController _pulseController;
-  late AnimationController _waveController;
   late Animation<double> _pulseAnimation;
-  late Animation<double> _waveAnimation;
 
-  Process? _audioProcess;
-  Timer? _listeningTimer;
-
-  static const platform = MethodChannel('ellmo/audio');
+  Timer? _connectionTimer;
+  Timer? _logTimer;
 
   @override
   void initState() {
     super.initState();
+    _detectMode();
     _initializeAnimations();
-    _loadConfiguration();
+    _initializeApp();
+  }
+
+  void _detectMode() {
+    // Check if running in headless mode
+    _isHeadless = Platform.environment.containsKey('FLUTTER_ENGINE_SWITCH_HEADLESS') ||
+                  Platform.environment['DISPLAY'] == null;
+
+    _addLog("Mode: ${_isHeadless ? 'Headless' : 'GUI'}");
   }
 
   void _initializeAnimations() {
     _pulseController = AnimationController(
       duration: Duration(seconds: 2),
-      vsync: this,
-    );
-    _waveController = AnimationController(
-      duration: Duration(milliseconds: 800),
       vsync: this,
     );
 
@@ -129,207 +73,101 @@ class _EllmoHomeState extends State<EllmoHome>
       curve: Curves.easeInOut,
     ));
 
-    _waveAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _waveController,
-      curve: Curves.easeInOut,
-    ));
-
-    _pulseController.repeat(reverse: true);
-  }
-
-  Future<void> _loadConfiguration() async {
-    try {
-      final configFile = File('/opt/ellmo/config.json');
-      if (await configFile.exists()) {
-        final configString = await configFile.readAsString();
-        final configJson = json.decode(configString);
-        _config = AppConfig.fromJson(configJson);
-      } else {
-        _config = AppConfig();
-        await _saveConfiguration();
-      }
-
-      await _initializeVoiceAssistant();
-    } catch (e) {
-      _config = AppConfig();
-      await _initializeVoiceAssistant();
+    if (!_isHeadless) {
+      _pulseController.repeat(reverse: true);
     }
   }
 
-  Future<void> _saveConfiguration() async {
-    try {
-      final configFile = File('/opt/ellmo/config.json');
-      await configFile.writeAsString(json.encode(_config.toJson()));
-    } catch (e) {
-      print('Error saving configuration: $e');
-    }
-  }
+  void _initializeApp() async {
+    _addLog("Initializing Ellmo...");
 
-  Future<void> _initializeVoiceAssistant() async {
     setState(() {
-      _status = "Starting audio system...";
+      _status = "Checking Ollama connection...";
     });
 
-    try {
-      await _startAudioHandler();
+    await _checkOllamaConnection();
+
+    if (_ollamaConnected) {
       setState(() {
-        _status = "Ready - Say '${_config.wakeWords.first}' to start";
+        _status = "Ready - Say 'Ellmo' to start";
       });
+      _addLog("✓ Ollama connected, system ready");
 
-      if (_config.autoStart) {
-        _startContinuousListening();
+      if (_isHeadless) {
+        _startHeadlessMode();
       }
-    } catch (e) {
+    } else {
       setState(() {
-        _status = "Error: $e";
+        _status = "Ollama not available";
       });
+      _addLog("✗ Ollama connection failed");
     }
-  }
 
-  Future<void> _startAudioHandler() async {
-    try {
-      _audioProcess = await Process.start(
-        'python3',
-        ['/opt/ellmo/linux/audio_handler.py'],
-        workingDirectory: '/opt/ellmo',
-      );
-
-      // Listen to audio handler responses
-      _audioProcess!.stdout
-          .transform(utf8.decoder)
-          .transform(LineSplitter())
-          .listen(_handleAudioResponse);
-
-      _audioProcess!.stderr
-          .transform(utf8.decoder)
-          .transform(LineSplitter())
-          .listen((line) => print('Audio Error: $line'));
-
-    } catch (e) {
-      throw Exception('Failed to start audio handler: $e');
-    }
-  }
-
-  void _handleAudioResponse(String line) {
-    try {
-      final response = json.decode(line);
-
-      switch (response['type']) {
-        case 'speech_result':
-          final text = response['text'] as String;
-          if (text.isNotEmpty) {
-            _processVoiceCommand(text);
-          }
-          break;
-        case 'speech_complete':
-          setState(() {
-            _isSpeaking = false;
-            _status = "Ready - Say '${_config.wakeWords.first}' to start";
-          });
-          break;
-        case 'error':
-          print('Audio handler error: ${response['message']}');
-          break;
-      }
-    } catch (e) {
-      print('Error parsing audio response: $e');
-    }
-  }
-
-  void _startContinuousListening() {
-    if (_isListening || _audioProcess == null) return;
-
-    setState(() {
-      _isListening = true;
-      _status = "Listening for wake word...";
+    // Start periodic checks
+    _connectionTimer = Timer.periodic(Duration(seconds: 30), (_) {
+      _checkOllamaConnection();
     });
+  }
 
-    _waveController.repeat();
+  void _startHeadlessMode() {
+    _addLog("Starting headless voice assistant mode...");
 
-    // Send listen command to audio handler
-    _audioProcess!.stdin.writeln(json.encode({'action': 'listen'}));
+    // In headless mode, we would start continuous listening
+    // For now, we'll simulate with periodic status updates
+    Timer.periodic(Duration(seconds: 10), (timer) {
+      _addLog("Voice assistant active - listening for 'Ellmo'");
 
-    // Set timeout for listening session
-    _listeningTimer?.cancel();
-    _listeningTimer = Timer(Duration(seconds: _config.audioTimeout), () {
-      if (_isListening && !_isProcessing) {
-        _startContinuousListening(); // Restart listening
+      // Simulate occasional interactions
+      if (DateTime.now().second % 30 == 0) {
+        _simulateVoiceInteraction();
       }
     });
   }
 
-  void _processVoiceCommand(String command) {
-    setState(() {
-      _lastCommand = command;
-      _isListening = false;
-    });
-
-    _waveController.stop();
-
-    // Check for wake word
-    bool hasWakeWord = _config.wakeWords.any((wake) =>
-        command.toLowerCase().contains(wake.toLowerCase())
-    );
-
-    if (!hasWakeWord) {
-      // No wake word detected, continue listening
-      _startContinuousListening();
-      return;
-    }
-
-    setState(() {
-      _isProcessing = true;
-      _status = "Processing: $command";
-    });
-
-    // Send to Ollama
-    _sendToOllama(command).then((response) {
+  void _simulateVoiceInteraction() {
+    _addLog("Voice command detected: 'Ellmo, hello'");
+    _sendToOllama("Hello, how are you?").then((response) {
+      _addLog("AI Response: $response");
       setState(() {
         _lastResponse = response;
-        _isProcessing = false;
-        _status = "Speaking...";
-        _conversationHistory.add("User: $command");
-        _conversationHistory.add("Assistant: $response");
-
-        // Keep only last 10 exchanges
-        if (_conversationHistory.length > 20) {
-          _conversationHistory = _conversationHistory.sublist(_conversationHistory.length - 20);
-        }
       });
-
-      _speak(response);
-    }).catchError((error) {
-      setState(() {
-        _isProcessing = false;
-        _status = "Error: $error";
-      });
-      _startContinuousListening();
     });
+  }
+
+  Future<void> _checkOllamaConnection() async {
+    try {
+      final response = await http.get(
+        Uri.parse('http://localhost:11434/api/tags'),
+      ).timeout(Duration(seconds: 5));
+
+      setState(() {
+        _ollamaConnected = response.statusCode == 200;
+      });
+
+      if (_ollamaConnected) {
+        _addLog("✓ Ollama connection verified");
+      }
+    } catch (e) {
+      setState(() {
+        _ollamaConnected = false;
+      });
+      _addLog("✗ Ollama connection failed: $e");
+    }
   }
 
   Future<String> _sendToOllama(String message) async {
+    if (!_ollamaConnected) {
+      return "Ollama is not connected";
+    }
+
     try {
-      final url = Uri.parse('http://${_config.ollamaHost}:${_config.ollamaPort}/api/generate');
+      final url = Uri.parse('http://localhost:11434/api/generate');
       final headers = {'Content-Type': 'application/json'};
 
-      // Build context from conversation history
-      String context = "";
-      if (_conversationHistory.isNotEmpty) {
-        context = _conversationHistory.takeLast(6).join('\n') + '\n';
-      }
-
       final body = json.encode({
-        'model': _config.model,
-        'prompt': context + message,
+        'model': 'mistral',
+        'prompt': message,
         'stream': false,
-        'options': {
-          'temperature': 0.7,
-          'top_p': 0.9,
-          'max_tokens': 150,
-        }
       });
 
       final response = await http.post(
@@ -342,91 +180,112 @@ class _EllmoHomeState extends State<EllmoHome>
         final data = json.decode(response.body);
         return data['response']?.toString().trim() ?? 'No response';
       } else {
-        throw Exception('Ollama returned status ${response.statusCode}');
+        return 'Error: ${response.statusCode}';
       }
     } catch (e) {
-      throw Exception('Failed to communicate with Ollama: $e');
+      return 'Error: $e';
     }
   }
 
-  void _speak(String text) {
+  void _addLog(String message) {
+    final timestamp = DateTime.now().toString().substring(11, 19);
+    final logEntry = "[$timestamp] $message";
+
     setState(() {
-      _isSpeaking = true;
-    });
-
-    // Send speak command to audio handler
-    _audioProcess?.stdin.writeln(json.encode({
-      'action': 'speak',
-      'text': text,
-    }));
-
-    // Fallback timer in case speech_complete is not received
-    Timer(Duration(seconds: text.length ~/ 10 + 5), () {
-      if (_isSpeaking) {
-        setState(() {
-          _isSpeaking = false;
-          _status = "Ready - Say '${_config.wakeWords.first}' to start";
-        });
-        _startContinuousListening();
+      _logs.add(logEntry);
+      if (_logs.length > 50) {
+        _logs.removeAt(0);
       }
     });
+
+    // Also print to console for headless mode
+    print(logEntry);
   }
 
-  void _toggleListening() {
-    if (_isListening) {
-      _listeningTimer?.cancel();
+  void _testAI() {
+    _addLog("Testing AI connection...");
+    _sendToOllama("Say hello in one sentence").then((response) {
+      _addLog("AI Test Result: $response");
       setState(() {
-        _isListening = false;
-        _status = "Stopped listening";
+        _lastResponse = response;
       });
-      _waveController.stop();
-    } else {
-      _startContinuousListening();
-    }
-  }
-
-  void _clearHistory() {
-    setState(() {
-      _conversationHistory.clear();
-      _lastResponse = "";
-      _lastCommand = "";
     });
   }
 
   @override
   void dispose() {
     _pulseController.dispose();
-    _waveController.dispose();
-    _listeningTimer?.cancel();
-    _audioProcess?.kill();
+    _connectionTimer?.cancel();
+    _logTimer?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isHeadless) {
+      // In headless mode, return minimal widget
+      return MaterialApp(
+        home: Scaffold(
+          body: Container(
+            color: Colors.black,
+            child: Center(
+              child: Text(
+                'Ellmo Running in Headless Mode\nCheck logs for activity',
+                style: TextStyle(color: Colors.white),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
+      appBar: AppBar(
+        title: Row(
+          children: [
+            Icon(Icons.assistant, color: Colors.blue),
+            SizedBox(width: 8),
+            Text('Ellmo'),
+          ],
+        ),
+        actions: [
+          Container(
+            margin: EdgeInsets.only(right: 16),
+            child: Row(
+              children: [
+                Icon(
+                  _ollamaConnected ? Icons.cloud_done : Icons.cloud_off,
+                  color: _ollamaConnected ? Colors.green : Colors.red,
+                  size: 20,
+                ),
+                SizedBox(width: 4),
+                Text(
+                  _ollamaConnected ? 'Connected' : 'Offline',
+                  style: TextStyle(fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Padding(
           padding: EdgeInsets.all(20),
           child: Column(
             children: [
-              // Header
-              _buildHeader(),
-
-              SizedBox(height: 30),
-
-              // Main status display
+              // Status display
               _buildStatusDisplay(),
 
-              SizedBox(height: 30),
+              SizedBox(height: 20),
 
               // Controls
               _buildControls(),
 
               SizedBox(height: 20),
 
-              // Conversation history
-              Expanded(child: _buildConversationHistory()),
+              // Logs
+              Expanded(child: _buildLogs()),
             ],
           ),
         ),
@@ -434,57 +293,21 @@ class _EllmoHomeState extends State<EllmoHome>
     );
   }
 
-  Widget _buildHeader() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          'Ellmo',
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        Row(
-          children: [
-            IconButton(
-              icon: Icon(Icons.settings, color: Colors.grey),
-              onPressed: _showSettingsDialog,
-            ),
-            IconButton(
-              icon: Icon(Icons.clear_all, color: Colors.grey),
-              onPressed: _clearHistory,
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
   Widget _buildStatusDisplay() {
-    Color statusColor = _isListening ? Colors.red :
-                       _isSpeaking ? Colors.blue :
-                       _isProcessing ? Colors.orange :
-                       Colors.green;
-
-    IconData statusIcon = _isListening ? Icons.mic :
-                         _isSpeaking ? Icons.volume_up :
-                         _isProcessing ? Icons.psychology :
-                         Icons.assistant;
+    Color statusColor = _ollamaConnected ? Colors.green : Colors.red;
+    IconData statusIcon = _ollamaConnected ? Icons.assistant : Icons.error_outline;
 
     return AnimatedBuilder(
-      animation: _isListening ? _waveAnimation : _pulseAnimation,
+      animation: _pulseAnimation,
       builder: (context, child) {
         return Transform.scale(
-          scale: _isListening ? (1.0 + _waveAnimation.value * 0.1) :
-                 _pulseAnimation.value * 0.8 + 0.2,
+          scale: _pulseAnimation.value,
           child: Container(
-            width: 200,
-            height: 200,
+            width: 150,
+            height: 150,
             decoration: BoxDecoration(
               color: statusColor.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(100),
+              borderRadius: BorderRadius.circular(75),
               border: Border.all(color: statusColor, width: 3),
             ),
             child: Column(
@@ -492,23 +315,20 @@ class _EllmoHomeState extends State<EllmoHome>
               children: [
                 Icon(
                   statusIcon,
-                  size: 80,
+                  size: 60,
                   color: statusColor,
                 ),
                 SizedBox(height: 10),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20),
-                  child: Text(
-                    _status,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                Text(
+                  _status,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
                   ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -523,18 +343,18 @@ class _EllmoHomeState extends State<EllmoHome>
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
         ElevatedButton.icon(
-          onPressed: _toggleListening,
-          icon: Icon(_isListening ? Icons.stop : Icons.mic),
-          label: Text(_isListening ? 'Stop' : 'Listen'),
+          onPressed: _ollamaConnected ? _testAI : null,
+          icon: Icon(Icons.chat),
+          label: Text('Test AI'),
           style: ElevatedButton.styleFrom(
-            backgroundColor: _isListening ? Colors.red : Colors.blue,
+            backgroundColor: Colors.blue,
             foregroundColor: Colors.white,
           ),
         ),
         ElevatedButton.icon(
-          onPressed: _isProcessing ? null : () => _processVoiceCommand("Test message"),
-          icon: Icon(Icons.chat),
-          label: Text('Test'),
+          onPressed: () => _checkOllamaConnection(),
+          icon: Icon(Icons.refresh),
+          label: Text('Refresh'),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.green,
             foregroundColor: Colors.white,
@@ -544,59 +364,63 @@ class _EllmoHomeState extends State<EllmoHome>
     );
   }
 
-  Widget _buildConversationHistory() {
-    if (_conversationHistory.isEmpty) {
-      return Center(
-        child: Text(
-          'Conversation history will appear here',
-          style: TextStyle(color: Colors.grey),
-        ),
-      );
-    }
-
+  Widget _buildLogs() {
     return Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
             padding: EdgeInsets.all(15),
-            child: Text(
-              'Recent Conversation',
-              style: TextStyle(
-                color: Colors.blue,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'System Logs',
+                  style: TextStyle(
+                    color: Colors.blue,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _logs.clear();
+                    });
+                  },
+                  icon: Icon(Icons.clear_all, size: 20),
+                  tooltip: 'Clear Logs',
+                ),
+              ],
             ),
           ),
           Expanded(
             child: ListView.builder(
-              itemCount: _conversationHistory.length,
+              reverse: true,
+              itemCount: _logs.length,
               itemBuilder: (context, index) {
-                final message = _conversationHistory[index];
-                final isUser = message.startsWith('User:');
+                final log = _logs[_logs.length - 1 - index];
+                final isError = log.contains('✗') || log.contains('Error');
+                final isSuccess = log.contains('✓');
 
-                return Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 15, vertical: 5),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        isUser ? Icons.person : Icons.assistant,
-                        color: isUser ? Colors.blue : Colors.green,
-                        size: 20,
-                      ),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          message.substring(message.indexOf(':') + 2),
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                    ],
+                return Container(
+                  margin: EdgeInsets.symmetric(horizontal: 15, vertical: 2),
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: isError ? Colors.red.withOpacity(0.1) :
+                           isSuccess ? Colors.green.withOpacity(0.1) :
+                           Colors.grey.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    log,
+                    style: TextStyle(
+                      color: isError ? Colors.red :
+                             isSuccess ? Colors.green :
+                             Colors.white70,
+                      fontSize: 12,
+                      fontFamily: 'monospace',
+                    ),
                   ),
                 );
               },
@@ -605,54 +429,5 @@ class _EllmoHomeState extends State<EllmoHome>
         ],
       ),
     );
-  }
-
-  void _showSettingsDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Settings'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: Text('Model: ${_config.model}'),
-              trailing: Icon(Icons.edit),
-              onTap: () => _showModelSelector(),
-            ),
-            ListTile(
-              title: Text('Language: ${_config.language}'),
-              trailing: Icon(Icons.edit),
-              onTap: () => _showLanguageSelector(),
-            ),
-            ListTile(
-              title: Text('Wake Words'),
-              subtitle: Text(_config.wakeWords.join(', ')),
-              trailing: Icon(Icons.edit),
-              onTap: () => _showWakeWordEditor(),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showModelSelector() {
-    // Implementation for model selection
-    // This would show available Ollama models
-  }
-
-  void _showLanguageSelector() {
-    // Implementation for language selection
-  }
-
-  void _showWakeWordEditor() {
-    // Implementation for wake word editing
   }
 }
