@@ -48,12 +48,17 @@ install_dependencies() {
     if command -v dnf &> /dev/null; then
         # Fedora/RHEL
         sudo dnf update -y
+
+        # Try to install packages, continue on errors
         sudo dnf install -y curl wget git unzip xz cmake ninja-build \
-            clang gtk3-devel pkgconf-devel \
+            clang gtk3-devel \
             alsa-lib-devel pulseaudio-libs-devel \
             espeak-ng espeak-ng-devel \
             python3 python3-pip \
-            systemd-devel
+            systemd-devel --skip-unavailable || true
+
+        # Try alternative package names for newer Fedora
+        sudo dnf install -y pkgconf-devel || sudo dnf install -y pkgconfig || true
 
     elif command -v apt &> /dev/null; then
         # Ubuntu/Debian/Raspberry Pi OS
@@ -78,6 +83,8 @@ install_dependencies() {
         echo -e "${RED}Unsupported package manager${NC}"
         exit 1
     fi
+
+    echo -e "${GREEN}✓ Dependencies installation completed${NC}"
 }
 
 # Install Flutter
@@ -154,7 +161,7 @@ create_flutter_app() {
     echo -e "${BLUE}Creating Flutter application...${NC}"
 
     cd $INSTALL_DIR
-    flutter create . --org com.voiceassistant --project-name ellmo
+    flutter create . --org com.ellmo --project-name ellmo
 
     # Replace main.dart with our implementation
     cat > lib/main.dart << 'EOF'
@@ -166,36 +173,36 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 void main() {
-  runApp(VoiceAssistantApp());
+  runApp(EllmoApp());
 }
 
-class VoiceAssistantApp extends StatelessWidget {
+class EllmoApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Voice Assistant',
+      title: 'Ellmo',
       theme: ThemeData(
         primarySwatch: Colors.blue,
         brightness: Brightness.dark,
       ),
-      home: VoiceAssistantHome(),
+      home: EllmoHome(),
       debugShowCheckedModeBanner: false,
     );
   }
 }
 
-class VoiceAssistantHome extends StatefulWidget {
+class EllmoHome extends StatefulWidget {
   @override
-  _VoiceAssistantHomeState createState() => _VoiceAssistantHomeState();
+  _EllmoHomeState createState() => _EllmoHomeState();
 }
 
-class _VoiceAssistantHomeState extends State<VoiceAssistantHome> {
+class _EllmoHomeState extends State<EllmoHome> {
   bool _isListening = false;
   bool _isSpeaking = false;
   String _lastResponse = "";
   String _status = "Ready";
 
-  static const platform = MethodChannel('voice_assistant/audio');
+  static const platform = MethodChannel('ellmo/audio');
 
   @override
   void initState() {
@@ -391,7 +398,7 @@ EOF
     # Update pubspec.yaml
     cat > pubspec.yaml << 'EOF'
 name: ellmo
-description: Voice Assistant with Ollama integration
+description: Ellmo - AI Voice Assistant with Ollama integration
 
 version: 1.0.0+1
 
@@ -568,7 +575,7 @@ static void my_application_init(MyApplication* self) {}
 
 MyApplication* my_application_new() {
   return MY_APPLICATION(g_object_new(my_application_get_type(),
-                                     "application-id", "com.voiceassistant.ellmo",
+                                     "application-id", "com.voiceassistant.flutter_voice_assistant",
                                      "flags", G_APPLICATION_HANDLES_COMMAND_LINE,
                                      nullptr));
 }
@@ -581,7 +588,7 @@ create_systemd_service() {
 
     sudo tee /etc/systemd/system/$SERVICE_NAME.service > /dev/null << EOF
 [Unit]
-Description=Flutter Voice Assistant
+Description=Ellmo - AI Voice Assistant
 After=graphical-session.target sound.target network.target ollama.service
 Wants=ollama.service
 
@@ -612,8 +619,8 @@ create_desktop_entry() {
 
     sudo tee $DESKTOP_FILE > /dev/null << EOF
 [Desktop Entry]
-Name=Voice Assistant
-Comment=AI Voice Assistant with Ollama
+Name=Ellmo
+Comment=Ellmo - AI Voice Assistant with Ollama
 Exec=$INSTALL_DIR/build/linux/x64/release/bundle/ellmo
 Icon=assistant
 Terminal=false
@@ -648,7 +655,7 @@ configure_audio() {
 # Main installation function
 main() {
     echo -e "${GREEN}Flutter Voice Assistant Installer${NC}"
-    echo -e "${YELLOW}This will install Flutter, Ollama, and the Voice Assistant${NC}"
+    echo -e "${YELLOW}This will install Flutter, Ollama, and Ellmo${NC}"
     echo
 
     # Check if running as root
@@ -676,8 +683,8 @@ main() {
     echo
     echo -e "${YELLOW}Next steps:${NC}"
     echo "1. Reboot your system or log out and back in"
-    echo "2. The voice assistant will start automatically"
-    echo "3. Say 'Hey Assistant' to activate voice commands"
+    echo "2. Ellmo will start automatically"
+    echo "3. Say 'Ellmo' to activate voice commands"
     echo
     echo -e "${BLUE}Manual start: sudo systemctl start $SERVICE_NAME${NC}"
     echo -e "${BLUE}Check status: sudo systemctl status $SERVICE_NAME${NC}"

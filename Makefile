@@ -1,4 +1,4 @@
-# Flutter Voice Assistant Makefile
+# Ellmo - AI Voice Assistant Makefile
 # Ułatwia zarządzanie projektem na różnych platformach
 
 # Zmienne
@@ -20,9 +20,10 @@ NC = \033[0m # No Color
 # Help
 .PHONY: help
 help:
-	@echo "$(BLUE)Flutter Voice Assistant - Makefile Commands$(NC)"
+	@echo "$(BLUE)Ellmo - AI Voice Assistant - Makefile Commands$(NC)"
 	@echo ""
 	@echo "$(GREEN)Installation:$(NC)"
+	@echo "  install          Full installation of Ellmo"GREEN)Installation:$(NC)"
 	@echo "  install          Full installation of the system"
 	@echo "  install-deps     Install only system dependencies"
 	@echo "  install-flutter  Install only Flutter SDK"
@@ -135,24 +136,24 @@ format:
 # Service management targets
 .PHONY: start stop restart status logs enable disable
 start:
-	@echo "$(BLUE)Starting voice assistant...$(NC)"
+	@echo "$(BLUE)Starting Ellmo...$(NC)"
 	@sudo systemctl start $(SERVICE_NAME)
 	@sleep 2
 	@sudo systemctl status $(SERVICE_NAME) --no-pager
 
 stop:
-	@echo "$(BLUE)Stopping voice assistant...$(NC)"
+	@echo "$(BLUE)Stopping Ellmo...$(NC)"
 	@sudo systemctl stop $(SERVICE_NAME)
 	@echo "$(GREEN)✓ Service stopped$(NC)"
 
 restart:
-	@echo "$(BLUE)Restarting voice assistant...$(NC)"
+	@echo "$(BLUE)Restarting Ellmo...$(NC)"
 	@sudo systemctl restart $(SERVICE_NAME)
 	@sleep 2
 	@sudo systemctl status $(SERVICE_NAME) --no-pager
 
 status:
-	@echo "$(BLUE)Service Status:$(NC)"
+	@echo "$(BLUE)Ellmo Status:$(NC)"
 	@sudo systemctl status $(SERVICE_NAME) --no-pager
 	@echo ""
 	@echo "$(BLUE)Ollama Status:$(NC)"
@@ -225,7 +226,7 @@ monitor:
 		systemctl is-active $(SERVICE_NAME) && \
 		systemctl is-active ollama && \
 		echo "=== Resources ===" && \
-		ps aux | grep -E "(flutter_voice|ollama)" | grep -v grep'; \
+		ps aux | grep -E "(ellmo|ollama)" | grep -v grep'; \
 	fi
 
 doctor:
@@ -281,11 +282,11 @@ for module in modules:
         print('$(RED)✗$(NC) ' + module)
 " 2>/dev/null
 	@echo ""
-	@echo "$(BLUE)=== Service Status ===$(NC)"
+	@echo "$(BLUE)=== Ellmo Status ===$(NC)"
 	@if systemctl is-active --quiet $(SERVICE_NAME); then \
-		echo "$(GREEN)✓ Voice Assistant service running$(NC)"; \
+		echo "$(GREEN)✓ Ellmo service running$(NC)"; \
 	else \
-		echo "$(RED)✗ Voice Assistant service not running$(NC)"; \
+		echo "$(RED)✗ Ellmo service not running$(NC)"; \
 	fi
 	@echo ""
 	@echo "$(BLUE)=== Configuration ===$(NC)"
@@ -387,7 +388,7 @@ create-installer:
 # Standalone installer - extracts and runs installation
 ARCHIVE_START=$(awk '/^__ARCHIVE_BELOW__$/{print NR + 1; exit 0; }' $0)
 tail -n+$ARCHIVE_START $0 | tar xzf -
-cd ellmo
+cd flutter-voice-assistant
 chmod +x install.sh
 ./install.sh
 exit 0
@@ -491,4 +492,7 @@ uninstall:
 	@echo "$(YELLOW)Are you sure? [y/N]$(NC)" && read ans && [ $${ans:-N} = y ]
 	@echo "$(BLUE)Uninstalling...$(NC)"
 	@sudo systemctl stop $(SERVICE_NAME) 2>/dev/null || true
-	@sudo systemctl disable $(SERVICE_NAME
+	@sudo systemctl disable $(SERVICE_NAME) 2>/dev/null || true
+	@sudo rm -rf $(INSTALL_DIR)
+	@sudo rm -f /etc/systemd/system/$(SERVICE_NAME).service
+	@echo "$(GREEN)✓ Uninstall completed$(NC)"

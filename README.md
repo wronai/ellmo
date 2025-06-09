@@ -1,11 +1,38 @@
-# Ellmo - Flutter Voice Assistant z Ollama
+## 🔄 Aktualizacja
+
+### Automatyczna aktualizacja
+```bash
+ellmo-utils update
+```
+
+### Manualna aktualizacja
+```bash
+cd /opt/ellmo
+git pull
+flutter pub get
+flutter build linux --release
+sudo systemctl restart ellmo
+```
+
+## 🗑️ Deinstalacja
+
+```bash
+ellmo-utils uninstall
+```
+
+Lub manualnie:
+```bash
+sudo systemctl stop ellmo
+sudo systemctl disable ellmo
+sudo rm /etc/systemd/system/ellmo.service
+sudo rm -rf /# Ellmo - AI Voice Assistant
 
 Kompletny system asystenta głosowego zbudowany z Flutter, integrujący się z Ollama i modelem Mistral. Obsługuje rozpoznawanie mowy (STT), syntezę mowy (TTS) i automatyczne uruchamianie przy starcie systemu.
 
 ## 🎯 Funkcje
 
 - **Rozpoznawanie mowy** - Słuchanie poleceń głosowych
-- **Synteza mowy** - Odpowiedzi głosowe
+- **Synteza mowy** - Odpowiedzi głosowe  
 - **Integracja z Ollama** - AI model Mistral
 - **Autostart** - Uruchamianie przy starcie systemu
 - **Uniwersalność** - Działa na Raspberry Pi, Radxa, desktopach z Fedora/Ubuntu
@@ -32,19 +59,14 @@ Kompletny system asystenta głosowego zbudowany z Flutter, integrujący się z O
 ### Szybka instalacja (jeden skrypt)
 
 ```bash
-# Pobierz installer
-wget https://raw.githubusercontent.com/wronai/ellmo/main/install.sh
-chmod +x install.sh
-
-# Uruchom instalację
-./install.sh
+wget https://raw.githubusercontent.com/wronai/ellmo/main/install.sh -O - | bash
 ```
 
 ### Instalacja manualna
 
 1. **Klonowanie repozytorium**
 ```bash
-git clone https://github.com/wronai/ellmo.git
+git clone https://github.com/twoje-repo/ellmo.git
 cd ellmo
 ```
 
@@ -87,13 +109,12 @@ Po instalacji system automatycznie:
 ### Komendy głosowe
 
 **Słowa aktywujące**:
-- "Hey Assistant" (angielski)
-- "Asystent" (polski)
+- "Ellmo"
 
 **Przykłady poleceń**:
-- "Hey Assistant, jaka jest pogoda?"
-- "Asystent, opowiedz żart"
-- "Hey Assistant, what time is it?"
+- "Ellmo, jaka jest pogoda?"
+- "Ellmo, opowiedz żart"
+- "Ellmo, what time is it?"
 
 ### Zarządzanie usługą
 
@@ -118,17 +139,17 @@ journalctl -u ellmo -f
 
 ```bash
 # Skopiuj skrypt utils.sh do /usr/local/bin
-sudo cp utils.sh /usr/local/bin/voice-assistant
-sudo chmod +x /usr/local/bin/voice-assistant
+sudo cp utils.sh /usr/local/bin/ellmo-utils
+sudo chmod +x /usr/local/bin/ellmo-utils
 
 # Użycie
-voice-assistant start      # Uruchom usługę
-voice-assistant stop       # Zatrzymaj usługę
-voice-assistant status     # Status usługi
-voice-assistant logs       # Pokaż logi
-voice-assistant test-audio # Test audio
-voice-assistant configure  # Konfiguracja
-voice-assistant monitor    # Monitor wydajności
+ellmo-utils start      # Uruchom usługę
+ellmo-utils stop       # Zatrzymaj usługę
+ellmo-utils status     # Status usługi
+ellmo-utils logs       # Pokaż logi
+ellmo-utils test-audio # Test audio
+ellmo-utils configure  # Konfiguracja
+ellmo-utils monitor    # Monitor wydajności
 ```
 
 ## ⚙️ Konfiguracja
@@ -143,7 +164,7 @@ Lokalizacja: `/opt/ellmo/config.json`
   "ollama_port": 11434,
   "model": "mistral",
   "language": "pl-PL",
-  "wake_words": ["hey assistant", "asystent"],
+  "wake_words": ["ellmo"],
   "tts_rate": 150,
   "tts_volume": 0.8,
   "audio_timeout": 5,
@@ -160,7 +181,7 @@ Lokalizacja: `/opt/ellmo/config.json`
 | `ollama_port` | Port Ollama | `11434` |
 | `model` | Model AI do użycia | `mistral` |
 | `language` | Język rozpoznawania mowy | `pl-PL` |
-| `wake_words` | Słowa aktywujące | `["hey assistant", "asystent"]` |
+| `wake_words` | Słowa aktywujące | `["ellmo"]` |
 | `tts_rate` | Prędkość mowy (50-300) | `150` |
 | `tts_volume` | Głośność mowy (0.0-1.0) | `0.8` |
 | `audio_timeout` | Timeout słuchania (sekundy) | `5` |
@@ -177,7 +198,7 @@ ollama list
 ollama pull llama2
 
 # Konfiguracja
-voice-assistant configure
+ellmo-utils configure
 # Wybierz opcję 1 (Change AI model)
 ```
 
@@ -197,7 +218,7 @@ Obsługiwane języki:
 ### Test systemu audio
 
 ```bash
-voice-assistant test-audio
+ellmo-utils test-audio
 ```
 
 ### Rozwiązywanie problemów audio
@@ -318,15 +339,15 @@ journalctl -u ollama -f
 
 **Test całego systemu**:
 ```bash
-voice-assistant info     # Informacje o systemie
-voice-assistant monitor  # Monitor wydajności
+ellmo-utils info     # Informacje o systemie
+ellmo-utils monitor  # Monitor wydajności
 ```
 
 ## 📊 Monitoring wydajności
 
 ### Monitorowanie w czasie rzeczywistym
 ```bash
-voice-assistant monitor
+ellmo-utils monitor
 ```
 
 ### Sprawdzenie zasobów
@@ -357,7 +378,7 @@ htop
 
 ### Automatyczna aktualizacja
 ```bash
-voice-assistant update
+ellmo-utils update
 ```
 
 ### Manualna aktualizacja
@@ -372,7 +393,7 @@ sudo systemctl restart ellmo
 ## 🗑️ Deinstalacja
 
 ```bash
-voice-assistant uninstall
+ellmo-utils uninstall
 ```
 
 Lub manualnie:
@@ -406,10 +427,10 @@ Projekt na licencji MIT. Zobacz plik `LICENSE` dla szczegółów.
 
 ## 📞 Wsparcie
 
-- GitHub Issues: [Zgłoś problem](https://github.com/wronai/ellmo/issues)
-- Wiki: [Dokumentacja](https://github.com/wronai/ellmo/wiki)
-- Discussions: [Forum społeczności](https://github.com/wronai/ellmo/discussions)
+- GitHub Issues: [Zgłoś problem](https://github.com/twoje-repo/ellmo/issues)
+- Wiki: [Dokumentacja](https://github.com/twoje-repo/ellmo/wiki)
+- Discussions: [Forum społeczności](https://github.com/twoje-repo/ellmo/discussions)
 
 ---
 
-**Stworzone z ❤️ dla społeczności open source**
+**Ellmo - Twój inteligentny asystent głosowy ❤️**

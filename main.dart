@@ -6,21 +6,21 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 void main() {
-  runApp(VoiceAssistantApp());
+  runApp(EllmoApp());
 }
 
-class VoiceAssistantApp extends StatelessWidget {
+class EllmoApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Voice Assistant',
+      title: 'Ellmo',
       theme: ThemeData(
         primarySwatch: Colors.blue,
         brightness: Brightness.dark,
         scaffoldBackgroundColor: Color(0xFF1E1E1E),
         cardColor: Color(0xFF2D2D2D),
       ),
-      home: VoiceAssistantHome(),
+      home: EllmoHome(),
       debugShowCheckedModeBanner: false,
     );
   }
@@ -42,7 +42,7 @@ class AppConfig {
     this.ollamaPort = 11434,
     this.model = 'mistral',
     this.language = 'pl-PL',
-    this.wakeWords = const ['hey assistant', 'asystent'],
+    this.wakeWords = const ['ellmo'],
     this.ttsRate = 150,
     this.ttsVolume = 0.8,
     this.audioTimeout = 5,
@@ -55,7 +55,7 @@ class AppConfig {
       ollamaPort: json['ollama_port'] ?? 11434,
       model: json['model'] ?? 'mistral',
       language: json['language'] ?? 'pl-PL',
-      wakeWords: List<String>.from(json['wake_words'] ?? ['hey assistant', 'asystent']),
+      wakeWords: List<String>.from(json['wake_words'] ?? ['ellmo']),
       ttsRate: json['tts_rate'] ?? 150,
       ttsVolume: (json['tts_volume'] ?? 0.8).toDouble(),
       audioTimeout: json['audio_timeout'] ?? 5,
@@ -78,12 +78,12 @@ class AppConfig {
   }
 }
 
-class VoiceAssistantHome extends StatefulWidget {
+class EllmoHome extends StatefulWidget {
   @override
-  _VoiceAssistantHomeState createState() => _VoiceAssistantHomeState();
+  _EllmoHomeState createState() => _EllmoHomeState();
 }
 
-class _VoiceAssistantHomeState extends State<VoiceAssistantHome>
+class _EllmoHomeState extends State<EllmoHome>
     with TickerProviderStateMixin {
   bool _isListening = false;
   bool _isSpeaking = false;
@@ -102,7 +102,7 @@ class _VoiceAssistantHomeState extends State<VoiceAssistantHome>
   Process? _audioProcess;
   Timer? _listeningTimer;
 
-  static const platform = MethodChannel('voice_assistant/audio');
+  static const platform = MethodChannel('ellmo/audio');
 
   @override
   void initState() {
@@ -439,7 +439,7 @@ class _VoiceAssistantHomeState extends State<VoiceAssistantHome>
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
-          'Voice Assistant',
+          'Ellmo',
           style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,

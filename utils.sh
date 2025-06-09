@@ -14,14 +14,14 @@ NC='\033[0m'
 
 # Function to show usage
 show_usage() {
-    echo "Flutter Voice Assistant Utilities"
+    echo "Ellmo Utilities"
     echo
     echo "Usage: $0 [COMMAND]"
     echo
     echo "Commands:"
-    echo "  start         Start the voice assistant service"
-    echo "  stop          Stop the voice assistant service"
-    echo "  restart       Restart the voice assistant service"
+    echo "  start         Start Ellmo service"
+    echo "  stop          Stop Ellmo service"
+    echo "  restart       Restart Ellmo service"
     echo "  status        Show service status"
     echo "  logs          Show service logs"
     echo "  install-model Install a new Ollama model"
@@ -34,27 +34,27 @@ show_usage() {
 
 # Service management functions
 start_service() {
-    echo -e "${BLUE}Starting voice assistant...${NC}"
+    echo -e "${BLUE}Starting Ellmo...${NC}"
     sudo systemctl start $SERVICE_NAME
     sleep 2
     sudo systemctl status $SERVICE_NAME --no-pager
 }
 
 stop_service() {
-    echo -e "${BLUE}Stopping voice assistant...${NC}"
+    echo -e "${BLUE}Stopping Ellmo...${NC}"
     sudo systemctl stop $SERVICE_NAME
-    echo -e "${GREEN}Voice assistant stopped${NC}"
+    echo -e "${GREEN}Ellmo stopped${NC}"
 }
 
 restart_service() {
-    echo -e "${BLUE}Restarting voice assistant...${NC}"
+    echo -e "${BLUE}Restarting Ellmo...${NC}"
     sudo systemctl restart $SERVICE_NAME
     sleep 2
     sudo systemctl status $SERVICE_NAME --no-pager
 }
 
 show_status() {
-    echo -e "${BLUE}Voice Assistant Status:${NC}"
+    echo -e "${BLUE}Ellmo Status:${NC}"
     sudo systemctl status $SERVICE_NAME --no-pager
     echo
     echo -e "${BLUE}Ollama Status:${NC}"
@@ -62,7 +62,7 @@ show_status() {
 }
 
 show_logs() {
-    echo -e "${BLUE}Voice Assistant Logs (press Ctrl+C to exit):${NC}"
+    echo -e "${BLUE}Ellmo Logs (press Ctrl+C to exit):${NC}"
     journalctl -u $SERVICE_NAME -f
 }
 
@@ -148,7 +148,7 @@ except:
 
 # Update application
 update_app() {
-    echo -e "${BLUE}Updating voice assistant...${NC}"
+    echo -e "${BLUE}Updating Ellmo...${NC}"
 
     # Stop service
     sudo systemctl stop $SERVICE_NAME
@@ -176,11 +176,11 @@ update_app() {
 
 # Uninstall application
 uninstall_app() {
-    echo -e "${YELLOW}This will completely remove the voice assistant${NC}"
+    echo -e "${YELLOW}This will completely remove Ellmo${NC}"
     read -p "Are you sure? (y/N): " confirm
 
     if [[ $confirm =~ ^[Yy]$ ]]; then
-        echo -e "${BLUE}Uninstalling voice assistant...${NC}"
+        echo -e "${BLUE}Uninstalling Ellmo...${NC}"
 
         # Stop and disable service
         sudo systemctl stop $SERVICE_NAME 2>/dev/null || true
@@ -199,7 +199,7 @@ uninstall_app() {
         # Remove from PATH (if added)
         sed -i '/flutter/d' ~/.bashrc 2>/dev/null || true
 
-        echo -e "${GREEN}Voice assistant uninstalled${NC}"
+        echo -e "${GREEN}Ellmo uninstalled${NC}"
         echo -e "${YELLOW}Note: Ollama and system dependencies were not removed${NC}"
     else
         echo -e "${YELLOW}Uninstall cancelled${NC}"
@@ -208,7 +208,7 @@ uninstall_app() {
 
 # Configuration
 configure_app() {
-    echo -e "${BLUE}Voice Assistant Configuration${NC}"
+    echo -e "${BLUE}Ellmo Configuration${NC}"
     echo
 
     CONFIG_FILE="$INSTALL_DIR/config.json"
@@ -221,7 +221,7 @@ configure_app() {
   "ollama_port": 11434,
   "model": "mistral",
   "language": "pl-PL",
-  "wake_words": ["hey assistant", "asystent"],
+  "wake_words": ["ellmo"],
   "tts_rate": 150,
   "tts_volume": 0.8,
   "audio_timeout": 5,

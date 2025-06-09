@@ -137,7 +137,7 @@ init_config() {
   "ollama_port": 11434,
   "model": "mistral",
   "language": "pl-PL",
-  "wake_words": ["hey assistant", "asystent"],
+  "wake_words": ["ellmo"],
   "tts_rate": 150,
   "tts_volume": 0.8,
   "audio_timeout": 5,
@@ -208,7 +208,7 @@ start_app() {
 
 # Function to cleanup on exit
 cleanup() {
-    log "${YELLOW}Shutting down Voice Assistant...${NC}"
+    log "${YELLOW}Shutting down Ellmo...${NC}"
 
     # Kill any remaining processes
     pkill -f "audio_handler.py" 2>/dev/null || true
@@ -222,7 +222,7 @@ trap cleanup EXIT INT TERM
 
 # Main execution
 main() {
-    log "${GREEN}=== Flutter Voice Assistant Startup ===${NC}"
+    log "${GREEN}=== Ellmo Startup ===${NC}"
 
     # Pre-flight checks
     if ! check_display; then
@@ -266,7 +266,7 @@ main() {
 
 # Help function
 show_help() {
-    echo "Flutter Voice Assistant Startup Script"
+    echo "Ellmo Startup Script"
     echo
     echo "Usage: $0 [OPTIONS]"
     echo
